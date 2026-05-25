@@ -58,6 +58,7 @@ services:
   nginx:
     image: nginx:alpine
     container_name: ecommerce-gateway
+    restart: always
     ports:
       - "8000:8000"
     volumes:
