@@ -85,7 +85,9 @@ func processMessage(msg amqp.Delivery) {
 	var event OrderEvent
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
 		log.Printf("❌ Failed to unmarshal message: %v", err)
-		msg.Nack(false, false) // Don't requeue malformed messages
+		if errNack := msg.Nack(false, false); errNack != nil {
+			log.Printf("❌ Failed to Nack message: %v", errNack)
+		}
 		return
 	}
 
@@ -112,5 +114,7 @@ func processMessage(msg amqp.Delivery) {
 	log.Println("═══════════════════════════════════════════════════")
 
 	// Acknowledge the message
-	msg.Ack(false)
+	if err := msg.Ack(false); err != nil {
+		log.Printf("❌ Failed to Ack message: %v", err)
+	}
 }
