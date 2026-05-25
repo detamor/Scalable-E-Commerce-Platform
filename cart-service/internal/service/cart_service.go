@@ -30,12 +30,7 @@ func (s *cartService) GetCart(ctx context.Context, userID uint) ([]model.CartIte
 }
 
 func (s *cartService) AddItem(ctx context.Context, userID uint, req model.AddToCartRequest) error {
-	item := model.CartItem{
-		ProductID: req.ProductID,
-		Name:      req.Name,
-		Price:     req.Price,
-		Quantity:  req.Quantity,
-	}
+	item := model.CartItem(req)
 	return s.repo.AddItem(ctx, userID, item)
 }
 
