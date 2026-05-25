@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS orders (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    user_id INTEGER NOT NULL,
+    total_amount DECIMAL(12,2) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING'
+);
+
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+
+CREATE TABLE IF NOT EXISTS order_items (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    price DECIMAL(12,2) NOT NULL,
+    quantity INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);

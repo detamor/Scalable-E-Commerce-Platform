@@ -18,6 +18,7 @@ FROM alpine:3.19
 RUN apk --no-cache add ca-certificates
 WORKDIR /app
 COPY --from=builder /order-service .
+COPY migrations/ ./migrations/
 
 EXPOSE 8084
 CMD ["./order-service"]
