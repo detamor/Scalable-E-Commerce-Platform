@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS products (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(12,2) NOT NULL,
+    stock INTEGER NOT NULL DEFAULT 0,
+    category VARCHAR(255),
+    image_url TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);

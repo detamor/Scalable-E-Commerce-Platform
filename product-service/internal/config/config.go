@@ -1,14 +1,17 @@
 package config
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-
-	"product-service/internal/model"
 )
 
 // Config holds application configuration values.
@@ -37,7 +40,7 @@ func LoadConfig() *Config {
 	}
 }
 
-// ConnectDB establishes a connection to PostgreSQL and auto-migrates tables.
+// ConnectDB establishes a connection to PostgreSQL and runs SQL migrations.
 func ConnectDB(cfg *Config) *gorm.DB {
 	dsn := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
@@ -49,12 +52,71 @@ func ConnectDB(cfg *Config) *gorm.DB {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	if err := db.AutoMigrate(&model.Product{}); err != nil {
-		log.Fatalf("Failed to auto-migrate: %v", err)
+	// Run SQL migrations instead of AutoMigrate
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("Failed to get underlying sql.DB: %v", err)
 	}
+	runMigrations(sqlDB, getEnv("MIGRATIONS_PATH", "/app/migrations"))
 
 	log.Println("Database connected and migrated successfully")
 	return db
+}
+
+// runMigrations reads and executes all *.up.sql files from the migrations directory.
+func runMigrations(db *sql.DB, migrationsPath string) {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version VARCHAR(255) PRIMARY KEY,
+			applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		log.Fatalf("Failed to create schema_migrations table: %v", err)
+	}
+
+	files, err := filepath.Glob(filepath.Join(migrationsPath, "*.up.sql"))
+	if err != nil {
+		log.Printf("Warning: could not read migrations directory: %v", err)
+		return
+	}
+	sort.Strings(files)
+
+	for _, file := range files {
+		version := filepath.Base(file)
+
+		var count int
+		err := db.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version = $1", version).Scan(&count)
+		if err != nil {
+			log.Fatalf("Failed to check migration status: %v", err)
+		}
+		if count > 0 {
+			continue
+		}
+
+		content, err := os.ReadFile(file)
+		if err != nil {
+			log.Fatalf("Failed to read migration file %s: %v", file, err)
+		}
+
+		statements := strings.Split(string(content), ";")
+		for _, stmt := range statements {
+			stmt = strings.TrimSpace(stmt)
+			if stmt == "" {
+				continue
+			}
+			if _, err := db.Exec(stmt); err != nil {
+				log.Fatalf("Failed to execute migration %s: %v", version, err)
+			}
+		}
+
+		_, err = db.Exec("INSERT INTO schema_migrations (version) VALUES ($1)", version)
+		if err != nil {
+			log.Fatalf("Failed to record migration %s: %v", version, err)
+		}
+
+		log.Printf("Applied migration: %s", version)
+	}
 }
 
 func getEnv(key, fallback string) string {
