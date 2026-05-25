@@ -90,6 +90,31 @@ Mock payment processing with simulated gateway.
 ### 6. Notification Service (Worker)
 Background consumer that listens for order events via RabbitMQ and simulates sending email/SMS notifications.
 
+## 🛡️ Production-Grade Features
+
+This platform is architected for production-grade reliability and scalability, incorporating the following 4 pillars:
+
+### 1. Database Migrations (Idempotent & Ordered)
+Replaced GORM's standard `AutoMigrate` with a structured, custom SQL migration system for all DB-backed services (`user-service`, `product-service`, `order-service`, `payment-service`).
+- **Ordered Changes**: SQL migrations are written in `migrations/*.up.sql` and `migrations/*.down.sql` files.
+- **Idempotency**: Tracked via a `schema_migrations` table to ensure migrations are only executed once.
+
+### 2. Resilience Patterns (Circuit Breaker & Retry)
+Added network resilience to the orchestration logic inside `order-service` when communicating with downstream services:
+- **Retry with Exponential Backoff**: Retries failed network calls up to 3 times with a base delay of 200ms up to a maximum of 2s.
+- **Stateful Circuit Breaker**: Prevents cascading failures by opening when a downstream service fails 5 times consecutively. Transitions through `CLOSED` ➔ `OPEN` ➔ `HALF-OPEN` ➔ `CLOSED` states.
+
+### 3. Unit & Integration Testing (Clean Architecture)
+Implemented high-coverage unit tests with Mock Repositories to isolate business logic:
+- **Mock Repositories**: Built custom in-memory repositories for testing.
+- **Test Scenarios**: Includes coverage for edge cases, error conditions, pagination logic, stock reduction, and circuit breaker state machines.
+
+### 4. CI/CD Pipeline (GitHub Actions)
+Fully automated Continuous Integration pipeline configured at `.github/workflows/ci.yml`:
+- **Code Quality**: Parallelized linting using `golangci-lint` built from source.
+- **Testing**: Runs tests with race conditions checks on all services.
+- **Docker Verification**: Validates that all Docker images build successfully without error.
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -121,7 +146,27 @@ To also remove data volumes:
 docker compose down -v
 ```
 
-## 🧪 Testing the API
+## 🧪 Testing
+
+### Running Tests Locally
+
+You can run the unit and resilience tests locally inside each microservice's directory:
+
+```bash
+# Test User Service
+cd user-service && go test -v ./internal/service/...
+
+# Test Product Service
+cd ../product-service && go test -v ./internal/service/...
+
+# Test Order Service (including Circuit Breaker & Retry state machine)
+cd ../order-service && go test -v ./internal/client/...
+```
+
+### Manual API Testing (Postman)
+A comprehensive Postman collection `postman_collection.json` is included at the root of the project to test the entire API flow (registration, authentication, product creation, cart operations, checkout, and notifications) with auto-saving authorization tokens.
+
+### Manual API Testing (cURL)
 
 ### 1. Register a User
 ```bash
